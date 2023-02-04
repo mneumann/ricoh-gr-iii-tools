@@ -15,7 +15,60 @@ class App
     return liveview(conn) if conn.method == 'get' && conn.request_path == '/liveview'
     return shoot(conn) if conn.method == 'post' && conn.request_path == '/shoot'
     return photos(conn) if conn.method == 'get' && conn.request_path.start_with?('/v1/photos')
+    return styles(conn) if conn.method == 'get' && conn.request_path == '/styles.css'
     not_found(conn)
+  end
+
+  STYLES = <<-ENDSTYLES
+    body {
+      margin:0; 
+      padding:0;
+      background: #020202;
+      width: 100vw;
+      height: 100vh;
+    }
+    .container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      flex-direction: row;
+    }
+    #liveview {
+      aspect-ratio: 3/2;
+      height: 100%;
+      margin:0;
+      padding:0;
+      cursor: crosshair;
+    }
+    .control {
+      width: 4em;
+      height: 3em;
+      background: #9f9f9f;
+      margin: 2em;
+      padding: 1em;
+    }
+
+    #thumbnails {
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    .img {
+      margin: 10px;
+      width: 480px; 
+      height: 360px;
+    }
+  ENDSTYLES
+
+  def styles(conn)
+    body = STYLES
+    conn
+      .put_resp_content_type('text/css')
+      .put_resp_header('date', 'Sat, 09 Oct 2010 14:28:02 GMT')
+      .put_resp_header('content-length', body.size)
+      .resp(200, body)
+      .send_resp
   end
 
   def index(conn)
@@ -24,36 +77,7 @@ class App
     <html>
         <head>
             <title>Live View</title>
-            <style type="text/css">
-            body {
-              margin:0; 
-              padding:0;
-              background: #020202;
-              width: 100vw;
-              height: 100vh;
-            }
-            .container {
-              width: 100%;
-              height: 100%;
-              display: flex;
-              justify-content: center;
-              flex-direction: row;
-            }
-            #liveview {
-              aspect-ratio: 3/2;
-              height: 100%;
-              margin:0;
-              padding:0;
-              cursor: crosshair;
-            }
-            .control {
-              width: 4em;
-              height: 3em;
-              background: #9f9f9f;
-              margin: 2em;
-              padding: 1em;
-            }
-            </style>
+            <link href="/styles.css" type="text/css">
         </head>
         <body onload="setup()">
           <script>
@@ -126,32 +150,7 @@ class App
     <html>
         <head>
             <title>Image Browser</title>
-            <style type="text/css">
-            body {
-              margin:0; 
-              padding:0;
-              background: #020202;
-              width: 100vw;
-              height: 100vh;
-            }
-            .container {
-              width: 100%;
-              height: 100%;
-              display:flex;
-              justify-content: center;
-              flex-direction: row;
-            }
-
-            #thumbnails {
-              display: flex;
-              flex-wrap: wrap;
-            }
-            .img {
-              margin: 10px;
-              width: 480px; 
-              height: 360px;
-            }
-            </style>
+            <link href="/styles.css" type="text/css">
         </head>
         <body onload="setup()">
           <script>
