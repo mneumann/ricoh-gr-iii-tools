@@ -100,7 +100,7 @@ class HTTPServer
 
     Plug::Conn.new(
       adapter: adapter,
-      host: nil,
+      host: @host,
       method: method.downcase,
       request_path: request_path,
       req_headers: req_headers,
