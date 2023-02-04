@@ -10,9 +10,11 @@ class App
 
   def call(conn)
     return index(conn) if conn.method == 'get' && conn.request_path == '/'
+    return browser(conn) if conn.method == 'get' && conn.request_path == '/browser'
     return props(conn) if conn.method == 'get' && conn.request_path == '/props'
     return liveview(conn) if conn.method == 'get' && conn.request_path == '/liveview'
     return shoot(conn) if conn.method == 'post' && conn.request_path == '/shoot'
+    return photos(conn) if conn.method == 'get' && conn.request_path.start_with?('/v1/photos')
     not_found(conn)
   end
 
@@ -80,7 +82,7 @@ class App
               const posX = calcPosX(ev);
               const posY = calcPosY(ev);
               const text = posX.toString() + " " + posY.toString();
-              const posEl = document.getElementById("pos").innerHTML = text;
+              document.getElementById("pos").innerHTML = text;
               return false;
             }
 
@@ -118,6 +120,77 @@ class App
       .send_resp
   end
 
+  def browser(conn)
+    body = <<-BODY
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>Image Browser</title>
+            <style type="text/css">
+            body {
+              margin:0; 
+              padding:0;
+              background: #020202;
+              width: 100vw;
+              height: 100vh;
+            }
+            .container {
+              width: 100%;
+              height: 100%;
+              display:flex;
+              justify-content: center;
+              flex-direction: row;
+            }
+
+            #thumbnails {
+              display: flex;
+              flex-wrap: wrap;
+            }
+            .img {
+              margin: 10px;
+              width: 480px; 
+              height: 360px;
+            }
+            </style>
+        </head>
+        <body onload="setup()">
+          <script>
+            function setup() {
+              fetch('/v1/photos')
+              .then((response) => response.json())
+              .then((data) => {
+                console.log(data);
+                const width = 320;
+                const height = 240;
+                const size = 'view';
+                const innerHTML = data.dirs.map((dir) => dir
+                    .files
+                    .filter((file) => file.endsWith(".JPG"))
+                    .map((file) => 
+                      `<img class="img" width="${width}" height="${height}" src="/v1/photos/${dir.name}/${file}?size=${size}">`
+                    ).join('')).join('');
+
+                document.getElementById("thumbnails").innerHTML = innerHTML;
+              });
+              return false;
+            }
+          </script>
+          <div class="container">
+            <div id="thumbnails">
+            </div>
+          </div>
+        </body>
+    </html>
+    BODY
+
+    conn
+      .put_resp_content_type('text/html')
+      .put_resp_header('date', 'Sat, 09 Oct 2010 14:28:02 GMT')
+      .put_resp_header('content-length', body.size)
+      .resp(200, body)
+      .send_resp
+  end
+
   def shoot(conn)
     if content_length = conn.get_req_header('content-length').first.then(&:to_i)
       body = conn.adapter.socket.read(content_length)
@@ -132,6 +205,21 @@ class App
     camera << "Content-Length: #{body.length}\r\n"
     camera << "\r\n"
     camera << body
+    camera.flush
+    _proxy(from_socket: camera, to_conn: conn)
+  end
+
+  def photos(conn)
+    camera = TCPSocket.new(@ricoh_ip, 80)
+    path = conn.request_path
+    if conn.query_string
+      path << "?"
+      path << conn.query_string
+    end
+
+    camera << "GET #{path} HTTP/1.0\r\n" 
+    camera << "Host: #{@ricoh_ip}\r\n" 
+    camera << "\r\n"
     camera.flush
     _proxy(from_socket: camera, to_conn: conn)
   end
