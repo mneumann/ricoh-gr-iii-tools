@@ -50,7 +50,6 @@ class Plug::Conn
     self
   end
 
-
   def send_resp
     raise if sent?
     raise if @state != :set
@@ -58,47 +57,46 @@ class Plug::Conn
     @adapter.send_resp(@status, @resp_headers, @resp_body)
     @state = :sent
 
-
     self
   end
 end
 
 class HTTPServer
-    def initialize(host:, port:, handler:)
+  def initialize(host:, port:, handler:)
     @host, @port, @handler = host, port, handler
   end
 
   def start
     server = TCPServer.new(@host, @port)
     loop do
-      adapter = HTTPServer::Adapter.new(server.accept)
-      Thread.new { handle_request(adapter) }
+      socket = server.accept
+      Thread.new { handle_request(socket) }
     end
   end
 
-  private def handle_request(adapter)
-    @handler.call(make_conn(adapter))
+  private def handle_request(socket)
+    @handler.call(make_conn(socket))
   rescue => ex
     STDERR.puts "ERROR: #{ex}"
     adapter.close
   end
 
-  private def make_conn(adapter)
+  private def make_conn(socket)
     # read request line
-    method, path, proto = adapter.socket.readline.strip.split(' ', 3)
+    method, path, proto = socket.readline.strip.split(' ', 3)
     request_path, query_string = path.split('?', 2) 
 
     # read headers
     req_headers = []
     loop do
-      line = adapter.socket.readline.chomp
+      line = socket.readline.chomp
       break if line.empty?
       header_name, header_value = line.split(":", 2).map(&:strip)
       req_headers << [header_name.downcase, header_value]
     end
 
     Plug::Conn.new(
-      adapter: adapter,
+      adapter: HTTPServer::Adapter.new(socket),
       host: nil,
       method: method.downcase,
       request_path: request_path,
