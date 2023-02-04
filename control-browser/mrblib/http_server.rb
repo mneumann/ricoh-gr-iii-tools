@@ -3,6 +3,8 @@ require 'socket' if RUBY_ENGINE == 'ruby'
 module Plug
 end
 
+class Plug::Header < Struct.new(:key, :value); end
+
 class Plug::Conn
   attr_reader :adapter, :host, :method, :request_path, :req_headers, :query_string
 
@@ -19,7 +21,7 @@ class Plug::Conn
   end
 
   def get_req_header(key)
-    @req_headers.filter_map {|k, v| k == key ? v : nil} 
+    @req_headers.filter_map {|h| h.key == key ? h.value : nil}
   end
 
   def sent?
@@ -28,13 +30,13 @@ class Plug::Conn
 
   def put_resp_header(key, value)
     raise if sent?
-    @resp_headers.each do |entry|
-      if entry[0] == key
-        entry[1] = value
+    @resp_headers.each do |h|
+      if h.key == key
+        h.value = value
         return
       end
     end
-    @resp_headers << [key, value]
+    @resp_headers << Plug::Header.new(key, value)
     self
   end
 
@@ -75,33 +77,38 @@ class HTTPServer
   end
 
   private def handle_request(socket)
-    @handler.call(make_conn(socket))
+    adapter = HTTPServer::Adapter.new(socket)
+    @handler.call(make_conn(adapter))
   rescue => ex
     STDERR.puts "ERROR: #{ex}"
     adapter.close
   end
 
-  private def make_conn(socket)
+  private def make_conn(adapter)
     # read request line
-    method, path, proto = socket.readline.strip.split(' ', 3)
+    method, path, proto = adapter._read_request_line
     request_path, query_string = path.split('?', 2) 
 
     # read headers
     req_headers = []
     loop do
-      line = socket.readline.chomp
+      line = adapter.socket.readline.chomp
       break if line.empty?
-      header_name, header_value = line.split(":", 2).map(&:strip)
-      req_headers << [header_name.downcase, header_value]
+      key, value = line.split(":", 2).map(&:strip)
+      req_headers << Plug::Header.new(map_header_key(key), value)
     end
 
     Plug::Conn.new(
-      adapter: HTTPServer::Adapter.new(socket),
+      adapter: adapter,
       host: nil,
       method: method.downcase,
       request_path: request_path,
       req_headers: req_headers,
       query_string: query_string)
+  end
+
+  private def map_header_key(key)
+    key.downcase
   end
 end
 
@@ -110,15 +117,29 @@ class HTTPServer::Adapter < Struct.new(:socket)
     socket.close
   end
 
+  def _read_request_line
+    method, path, proto = socket.readline.strip.split(' ', 3)
+    @proto = proto.downcase
+    [method, path, proto]
+  end
+
   def send_resp(status, resp_headers, resp_body)
     sock = self.socket
 
     sock << "HTTP/1.0 #{status} #{status_text(status)}\r\n"
-    resp_headers.each {|k, v| sock << "#{k}: #{v}\r\n"}
+    resp_headers.each {|h| sock << "#{h.key}: #{h.value}\r\n"}
     sock << "\r\n" 
     sock << resp_body
 
-    sock.close if resp_headers.any? {|k, v| k == 'connection' && v == 'close'}
+    # We answer in HTTP/1.0, which always closes connection unless keep-alive
+    # is specified.
+    if resp_headers.any? {|h| h.key == 'connection' && h.value == 'keep-alive'}
+      # keep open... TODO
+    elsif resp_headers.any? {|h| h.key == 'connection' && h.value == 'close'}
+      sock.close
+    else
+      sock.close
+    end
   end
 
   private def status_text(status)
@@ -134,15 +155,14 @@ end
 if __FILE__ == $0
   class App
     def call(conn)
-      if content_length = conn.get_req_header('content-length').map(&:to_i).first
+      if content_length = conn.get_req_header('content-length').first.then(&:to_i)
         p conn.adapter.socket.read(content_length)
       end
 
       conn
         .put_resp_content_type('text/plain')
         .put_resp_header('date', 'Sat, 09 Oct 2010 14:28:02 GMT')
-        .put_resp_header('connection', 'close')
-        .resp(200, "12345")
+        .resp(200, '12345')
         .send_resp
     end
   end
