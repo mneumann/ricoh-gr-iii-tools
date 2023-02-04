@@ -4,6 +4,10 @@ if RUBY_ENGINE == 'ruby'
 end
 
 class App
+  def initialize(ricoh_ip: "192.168.0.1")
+    @ricoh_ip = ricoh_ip
+  end
+
   def call(conn)
     return index(conn) if conn.method == 'get' && conn.request_path == '/'
     return liveview(conn) if conn.method == 'get' && conn.request_path == '/liveview'
@@ -17,11 +21,42 @@ class App
     <html>
         <head>
             <title>Live View</title>
+            <style type="text/css">
+            body {
+              margin:0; 
+              padding:0;
+              background: #020202;
+              width: 100vw;
+              height: 100vh;
+            }
+            .container {
+              width: 100%;
+              height: 100%;
+              display: flex;
+              justify-content: center;
+              flex-direction: row;
+            }
+            #liveview {
+              aspect-ratio: 3/2;
+              height: 100%;
+              margin:0;
+              padding:0;
+              cursor: crosshair;
+            }
+            .control {
+              width: 4em;
+              height: 3em;
+              background: #9f9f9f;
+              margin: 2em;
+              padding: 1em;
+            }
+            </style>
         </head>
-        <body style="margin: 0; padding: 0;">
+        <body onload="setup()">
           <script>
             function shoot({af, posX, posY})
             {
+              console.log({af, posX, posY});
               var body = "af=" + (af ? "on" : "off") + "&pos=" + posX.toString() + "," + posY.toString();
 
               const headers = {'Content-Type': 'application/x-www-form-urlencoded'};
@@ -29,16 +64,39 @@ class App
               .then((response) => response.json())
               .then((data) => console.log(data));
             }
+
             function handleClick(ev)
             {
-              const posX = Math.trunc(100.0 * ev.clientX / ev.target.clientWidth);
-              const posY = Math.trunc(100.0 * ev.clientY / ev.target.clientHeight);
-              console.log({posX, posY});
-              shoot({af: true, posX, posY});
+              shoot({
+                af: document.getElementById("af").checked,
+                posX: calcPosX(ev),
+                posY: calcPosY(ev)
+              });
               return false;
             }
+
+            function handleMove(ev) {
+              const posX = calcPosX(ev);
+              const posY = calcPosY(ev);
+              const text = posX.toString() + " " + posY.toString();
+              const posEl = document.getElementById("pos").innerHTML = text;
+              return false;
+            }
+
+            function calcPosX(ev) { return Math.trunc(100.0 * ev.offsetX / ev.target.clientWidth); }
+            function calcPosY(ev) { return Math.trunc(100.0 * ev.offsetY / ev.target.clientHeight); }
+
+            function setup() {
+              document.getElementById('liveview').addEventListener('mousemove', handleMove); 
+            }
           </script>
-          <img src="/liveview" style="width: 135vh; height: 90vh;" onclick="handleClick(event)">
+          <div class="container">
+            <img id="liveview" src="/liveview" onclick="handleClick(event)" onmove="handleMove(event)">
+            <div class="control">
+              <label for="af">AF <input id="af" type="checkbox" checked></label>
+              <div id="pos">? ?</div>
+            <div>
+          </div>
         </body>
     </html>
     BODY
@@ -58,9 +116,9 @@ class App
       raise 'no content-length'
     end
 
-    camera = TCPSocket.new('192.168.0.1', 80)
+    camera = TCPSocket.new(@ricoh_ip, 80)
     camera << "POST /v1/camera/shoot HTTP/1.0\r\n" 
-    camera << "Host: 192.168.0.1\r\n" 
+    camera << "Host: #{@ricoh_ip}\r\n" 
     camera << "Content-Type: application/x-www-form-urlencoded\r\n" 
     camera << "Content-Length: #{body.length}\r\n"
     camera << "\r\n"
@@ -70,9 +128,9 @@ class App
   end
 
   def liveview(conn)
-    camera = TCPSocket.new('192.168.0.1', 80)
+    camera = TCPSocket.new(@ricoh_ip, 80)
     camera << "GET /v1/liveview HTTP/1.0\r\n" 
-    camera << "Host: 192.168.0.1\r\n" 
+    camera << "Host: #{@ricoh_ip}\r\n" 
     camera << "\r\n"
     camera.flush
     _proxy(from_socket: camera, to_conn: conn)
