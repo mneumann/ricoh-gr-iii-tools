@@ -10,6 +10,7 @@ class App
 
   def call(conn)
     return index(conn) if conn.method == 'get' && conn.request_path == '/'
+    return props(conn) if conn.method == 'get' && conn.request_path == '/props'
     return liveview(conn) if conn.method == 'get' && conn.request_path == '/liveview'
     return shoot(conn) if conn.method == 'post' && conn.request_path == '/shoot'
     not_found(conn)
@@ -89,12 +90,20 @@ class App
             function setup() {
               document.getElementById('liveview').addEventListener('mousemove', handleMove); 
             }
+
+            function showProps() {
+              fetch('/props')
+              .then((response) => response.json())
+              .then((data) => console.log(data));
+              return false;
+            }
           </script>
           <div class="container">
             <img id="liveview" src="/liveview" onclick="handleClick(event)" onmove="handleMove(event)">
             <div class="control">
               <label for="af">AF <input id="af" type="checkbox" checked></label>
               <div id="pos">? ?</div>
+              <button onclick="showProps()">Props</button>
             <div>
           </div>
         </body>
@@ -124,7 +133,16 @@ class App
     camera << "\r\n"
     camera << body
     camera.flush
-    _proxy(from_socket: camera, to_conn: conn, debug: true)
+    _proxy(from_socket: camera, to_conn: conn)
+  end
+
+  def props(conn)
+    camera = TCPSocket.new(@ricoh_ip, 80)
+    camera << "GET /v1/props HTTP/1.0\r\n" 
+    camera << "Host: #{@ricoh_ip}\r\n" 
+    camera << "\r\n"
+    camera.flush
+    _proxy(from_socket: camera, to_conn: conn)
   end
 
   def liveview(conn)
@@ -144,7 +162,7 @@ class App
       .send_resp
   end
 
-  private def _proxy(from_socket:, to_conn:, debug: false)
+  private def _proxy(from_socket:, to_conn:)
     to_conn.adapter.socket << from_socket.readline
     loop do
       header = from_socket.readline.chomp
