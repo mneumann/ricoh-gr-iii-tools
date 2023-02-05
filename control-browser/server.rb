@@ -77,7 +77,7 @@ class App
     <html>
         <head>
             <title>Live View</title>
-            <link href="/styles.css" type="text/css">
+            <link rel="stylesheet" type="text/css" href="/styles.css">
         </head>
         <body onload="setup()">
           <script>
@@ -150,7 +150,7 @@ class App
     <html>
         <head>
             <title>Image Browser</title>
-            <link href="/styles.css" type="text/css">
+            <link rel="stylesheet" type="text/css" href="/styles.css">
         </head>
         <body onload="setup()">
           <script>
