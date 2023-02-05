@@ -273,9 +273,8 @@ class App
   end
 end
 
-if __FILE__ == $0
+if RUBY_ENGINE != 'ruby' or __FILE__ == $0
   server = HTTPServer.new(host: '127.0.0.1', port: 8080, handler: App.new)
+  puts "[Point your browser at: http://localhost:8080/ or http://localhost:8080/browser]"
   server.start
 end
-
-

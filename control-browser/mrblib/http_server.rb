@@ -64,15 +64,19 @@ class Plug::Conn
 end
 
 class HTTPServer
-  def initialize(host:, port:, handler:)
-    @host, @port, @handler = host, port, handler
+  def initialize(host:, port:, handler:, threaded: false)
+    @host, @port, @handler, @threaded = host, port, handler, threaded
   end
 
   def start
     server = TCPServer.new(@host, @port)
     loop do
       socket = server.accept
-      Thread.new { handle_request(socket) }
+      if @threaded
+        Thread.new { handle_request(socket) }
+      else
+        handle_request(socket)
+      end
     end
   end
 
@@ -81,6 +85,7 @@ class HTTPServer
     @handler.call(make_conn(adapter))
   rescue => ex
     STDERR.puts "ERROR: #{ex}"
+    p ex.backtrace
     adapter.close
   end
 
@@ -112,14 +117,14 @@ class HTTPServer
   end
 end
 
-class HTTPServer::Adapter < Struct.new(:socket)
+class HTTPServer::Adapter < Struct.new(:socket, :proto)
   def close
     socket.close
   end
 
   def _read_request_line
     method, path, proto = socket.readline.strip.split(' ', 3)
-    @proto = proto.downcase
+    self.proto = proto.downcase
     [method, path, proto]
   end
 
