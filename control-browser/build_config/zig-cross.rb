@@ -6,6 +6,8 @@ MRuby::CrossBuild.new("zig-cross-#{ZIG_TARGET}") do |conf|
   conf.cc.command = "zig cc -target #{ZIG_TARGET}"
   conf.linker.command = "zig cc -target #{ZIG_TARGET}"
 
+  conf.gem mgem: 'mruby-process'
+
   conf.gembox 'default'
 
   conf.test_runner.command = 'env'

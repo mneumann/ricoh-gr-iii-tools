@@ -64,23 +64,21 @@ class Plug::Conn
 end
 
 class HTTPServer
-  def initialize(host:, port:, handler:, threaded: false)
-    @host, @port, @handler, @threaded = host, port, handler, threaded
+  def initialize(host:, port:, handler:)
+    @host, @port, @handler = host, port, handler
   end
 
   def start
     server = TCPServer.new(@host, @port)
+    server.close_on_exec = true
     loop do
       socket = server.accept
-      if @threaded
-        Thread.new { handle_request(socket) }
-      else
-        handle_request(socket)
-      end
+      Process.fork { handle_request(socket) }
+      socket.close
     end
   end
 
-  private def handle_request(socket)
+  def handle_request(socket)
     adapter = HTTPServer::Adapter.new(socket)
     @handler.call(make_conn(adapter))
   rescue => ex

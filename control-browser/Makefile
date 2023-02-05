@@ -13,7 +13,7 @@ ${MRUBY_SOURCE_DIR}: mruby-3.1.0.zip
 mruby-3.1.0.zip:
 	${FETCH} -o mruby-3.1.0.zip https://github.com/mruby/mruby/archive/3.1.0.zip
 
-build-all: build-default build-aarch64
+build-all: build build-aarch64
 
 build: mruby-src
 	env MRUBY_CONFIG=./build_config/default.rb \
