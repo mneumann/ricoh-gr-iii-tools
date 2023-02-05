@@ -266,7 +266,7 @@ class App
       to_conn.adapter.socket << "#{key}: #{value}\r\n"
     end
 
-    while buf = from_socket.read(4 * 4096)
+    while buf = from_socket.read(4096)
       to_conn.adapter.socket << buf
     end
     to_conn.adapter.socket.close
