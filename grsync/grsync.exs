@@ -28,31 +28,28 @@ defmodule RicohGR.Api do
     %Api{_base_req: Req.new(base_url: "http://192.168.0.1/v1")}
   end
 
-  def list_all_photos!(%Api{} = api) do
-    collect_all_photos(api, nil, [])
-  end
-
-  defp collect_all_photos(api, last_image, result) do
-    case api |> list_photos!(after: last_image) do
+  def photo_stream(%Api{} = api) do
+    Stream.unfold(list_photos!(api), fn
       [] ->
-        List.flatten(result)
+        nil
 
-      list ->
-        api
-        |> collect_all_photos(
-          list
-          |> Enum.max_by(&CameraFile.path(&1))
-          |> RicohGR.CameraFile.path(),
-          [result | list]
-        )
-    end
+      photos ->
+        {photos,
+         list_photos!(
+           api,
+           after:
+             photos
+             |> Enum.max_by(&CameraFile.path(&1))
+             |> RicohGR.CameraFile.path()
+         )}
+    end)
+    |> Stream.flat_map(fn x -> x end)
   end
 
   def list_photos!(%Api{} = api, opts \\ []) do
     params =
       Enum.reduce(opts, [], fn
         {:limit, q_limit}, params -> [{:limit, q_limit} | params]
-        {:after, nil}, params -> params
         {:after, q_after}, params -> [{:after, q_after} | params]
         invalid, _params -> raise "Invalid option: #{invalid}"
       end)
@@ -105,7 +102,7 @@ defmodule Main do
   def sync_all_photos(out_dir, include_filetypes, size) do
     api = Api.new()
 
-    Api.list_all_photos!(api)
+    Api.photo_stream(api)
     |> Enum.filter(&(include_filetypes == :all or CameraFile.filetype(&1) in include_filetypes))
     |> Enum.reject(&File.exists?(Path.join(out_dir, CameraFile.path(&1))))
     |> Enum.sort_by(& &1.file, :desc)
