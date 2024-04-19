@@ -15,15 +15,7 @@ defmodule RicohGR.CameraFile do
     end
   end
 
-  def is_jpg?(%CameraFile{file: file}), do: String.ends_with?(file, ".JPG")
-  def is_dng?(%CameraFile{file: file}), do: String.ends_with?(file, ".DNG")
-  def is_mov?(%CameraFile{file: file}), do: String.ends_with?(file, ".MOV")
-
   def path(%CameraFile{dir: dir, file: file}), do: Path.join(dir, file)
-
-  def path(%CameraFile{} = camerafile, basedir) do
-    Path.join(basedir, path(camerafile))
-  end
 end
 
 defmodule RicohGR.Api do
@@ -115,11 +107,11 @@ defmodule Main do
 
     Api.list_all_photos!(api)
     |> Enum.filter(&(include_filetypes == :all or CameraFile.filetype(&1) in include_filetypes))
-    |> Enum.reject(&File.exists?(CameraFile.path(&1, out_dir)))
+    |> Enum.reject(&File.exists?(Path.join(out_dir, CameraFile.path(&1))))
     |> Enum.sort_by(& &1.file, :desc)
     |> Stream.each(fn camerafile ->
       IO.inspect([CameraFile.filetype(camerafile), size])
-      localfile = CameraFile.path(camerafile, out_dir)
+      localfile = Path.join(out_dir, CameraFile.path(camerafile))
       IO.puts("Downloading #{camerafile.dir}/#{camerafile.file} to #{localfile}")
 
       case Api.download_photo(api, camerafile, size) do
