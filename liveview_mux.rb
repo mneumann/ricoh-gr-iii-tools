@@ -1,8 +1,8 @@
 #
 # Multiplexes Ricoh GR III liveview MJPEG to multiple clients.
 #
-# Somehow this shows less lag when OBS Studio connects against it, as when OBS
-# directly connects against Ricoh GR III with WIFI on
+# Somehow this shows less lag when OBS Studio connects against it as compared
+# to when OBS directly connects against Ricoh GR III with WIFI on
 # (http://192.168.0.1/v1/liveview).
 #
 # Starts a HTTP server on localhost:3333. Just point your browser to 
